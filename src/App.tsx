@@ -1,57 +1,67 @@
-import React, {useState} from 'react';
-import {Button, List, Tag, NavBar, Modal, Input, Form, Selector} from 'antd-mobile'
-import {Radio} from 'antd'
+import React, {useEffect, useState} from 'react';
+import {Button, List, Tag, NavBar, Modal, Input, Form, Selector, Loading} from 'antd-mobile'
+import {message, Radio} from 'antd'
+import {deleteCard, getCardList, saveCard} from "./api";
 
 
-const cards = [
-  {
-    name: 'Phone',
-    uid: 'sjsjdks',
-    type: 1
-  },
-  {
-    name: 'Blue',
-    uid: 'sadasd',
-    type: 1
-  },
-  {
-    name: '用户',
-    uid: '2wqewqeq',
-    type: 2,
+const App: React.FC = () => {
+  const [cardList, setCardList] = useState<{ uid: string, name: string, type: number }[] | undefined>()
+  const [card, setCard] = useState<{ uid: string, name: string, type: number } | undefined>()
+  const [form] = Form.useForm()
+
+  const getCards = () => {
+    getCardList().then(res => {
+      setCardList(res)
+    })
   }
-]
-const App: React.FC = () => (
-  <div className="App">
+
+  useEffect(() => {
+    getCards()
+  }, [])
+
+  return <div className="App">
     <NavBar back={null}>卡片列表</NavBar>
     <List>
-      {cards.map(card => (
+      {cardList?.map((card, i) => (
         <List.Item
           clickable={true}
-          key={card.name}
+          key={`${card.uid}_${i}`}
           description={card.uid}
           onClick={(e) => {
-            Modal.alert({
+            form.setFieldsValue({
+              ...card, type: card.type.toString()
+            })
+            Modal.show({
               title: "修改卡片信息",
-              content: <>
-                <Form layout='horizontal'>
-                  <Form.Item label='uid' name='uid'>
-                    <Input defaultValue={card.uid} readOnly disabled/>
-                  </Form.Item>
-                  <Form.Item label='备注' name='comment'>
-                    <Input placeholder='请输入备注' clearable defaultValue={card.name}/>
-                  </Form.Item>
-                  <Form.Item label="卡片类型" name="type" required={false}>
-                    <Radio.Group
-                      optionType="button"
-                      buttonStyle="solid"
-                      defaultValue={card.type.toString()}
-                    >
-                      <Radio.Button value="2">普通卡</Radio.Button>
-                      <Radio.Button value="1">管理卡</Radio.Button>
-                    </Radio.Group>
-                  </Form.Item>
-                </Form>
-              </>
+              showCloseButton: true,
+              closeOnAction: true,
+              actions: [{
+                key: 'save',
+                text: '保存',
+                primary: true,
+                onClick: () => {
+                  form.validateFields().then((values) => {
+                    saveCard({uid: values.uid, name: values.name, card_type: values.type}).then(() => {
+                      message.success('保存成功')
+                      getCards()
+                    })
+                  })
+
+                }
+              },
+                {
+                  key: 'cancel',
+                  text: '删除',
+                  primary: true,
+                  danger: true,
+                  onClick: () => {
+                    deleteCard({uid: card.uid}).then(() => {
+                      message.success('删除成功')
+                      getCards()
+                    })
+                  }
+                }],
+              content: <><FormContainer form={form}/></>
             })
           }}
         >
@@ -67,8 +77,45 @@ const App: React.FC = () => (
       ))}
     </List>
     <Button block color='primary' size='large' shape='rounded'
-            style={{width: "90%", marginInline: "5%", marginTop: "10%"}}>新增卡片</Button>
+            style={{width: "90%", marginInline: "5%", marginTop: "10%"}}
+            onClick={() => {
+              const host = window.location.host
+              const ws = new WebSocket(`ws://${host}/ws/add_card`)
+              if (ws.readyState === ws.OPEN) {
+                ws.onmessage = (e) => {
+                  setCard(e.data)
+                  form.setFieldsValue({...e.data, type: e.data.type.toString()})
+                }
+              }
+
+              Modal.show({
+                onClose: () => {
+                  ws.close()
+                },
+                content: (card ? <FormContainer form={form}/> : <Loading/>),
+              })
+            }}>新增卡片</Button>
   </div>
-);
+};
+
+const FormContainer = ({form}: any) => {
+  return <Form layout='horizontal' form={form}>
+    <Form.Item label='uid' name='uid'>
+      <Input readOnly disabled/>
+    </Form.Item>
+    <Form.Item label='备注' name='name'>
+      <Input placeholder='请输入备注' clearable/>
+    </Form.Item>
+    <Form.Item label="卡片类型" name="type" required={false}>
+      <Radio.Group
+        optionType="button"
+        buttonStyle="solid"
+      >
+        <Radio.Button value="2">普通卡</Radio.Button>
+        <Radio.Button value="1">管理卡</Radio.Button>
+      </Radio.Group>
+    </Form.Item>
+  </Form>
+}
 
 export default App;

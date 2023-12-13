@@ -2,9 +2,7 @@
 POST http://192.168.4.1/api/save_card
 Content-Type: application/x-www-form-urlencoded
 
-name = Phone &
-uid = 020187d7 &
-card_type = 1
+name=Phone&uid=120187d3&card_type=1
 
 <> 2023-12-07T025353.200.txt
 <> 2023-12-07T025341.200.txt
