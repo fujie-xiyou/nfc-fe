@@ -19,6 +19,24 @@ const App: React.FC = () => {
     getCards()
   }, [])
 
+  const saveAction = {
+    key: 'save',
+    text: '保存',
+    primary: true,
+    onClick: () => {
+      form.validateFields().then((values) => {
+        saveCard({
+          uid: values.uid,
+          name: values.name,
+          card_type: values.type
+        }).then(() => {
+          message.success('保存成功')
+          getCards()
+        })
+      })
+    }
+  }
+
   return <div className="App">
     <NavBar back={null}>卡片列表</NavBar>
     <List>
@@ -35,20 +53,8 @@ const App: React.FC = () => {
               title: "修改卡片信息",
               showCloseButton: true,
               closeOnAction: true,
-              actions: [{
-                key: 'save',
-                text: '保存',
-                primary: true,
-                onClick: () => {
-                  form.validateFields().then((values) => {
-                    saveCard({uid: values.uid, name: values.name, card_type: values.type}).then(() => {
-                      message.success('保存成功')
-                      getCards()
-                    })
-                  })
-
-                }
-              },
+              actions: [
+                saveAction,
                 {
                   key: 'cancel',
                   text: '删除',
@@ -81,19 +87,32 @@ const App: React.FC = () => {
             onClick={() => {
               const host = window.location.host
               const ws = new WebSocket(`ws://${host}/ws/add_card`)
-              if (ws.readyState === ws.OPEN) {
-                ws.onmessage = (e) => {
-                  setCard(e.data)
-                  form.setFieldsValue({...e.data, type: e.data.type.toString()})
+              // loading
+              const loadingModal = Modal.show({
+                showCloseButton: true,
+                content: <Loading/>,
+                onClose:() => {
+                  ws.close()
                 }
+              })
+
+              // 新增
+              ws.onmessage = (e) => {
+                console.log("data", e.data)
+                setCard({uid: e.data, name: "", type: 2,})
+                form.setFieldsValue({uid: e.data, type: "2"})
+                Modal.show({
+                  title: "保存卡片信息",
+                  showCloseButton: true,
+                  closeOnAction:true,
+                  onClose: () => {
+                    loadingModal.close()
+                  },
+                  actions: [saveAction],
+                  content: (<FormContainer form={form}/>),
+                })
               }
 
-              Modal.show({
-                onClose: () => {
-                  ws.close()
-                },
-                content: (card ? <FormContainer form={form}/> : <Loading/>),
-              })
             }}>新增卡片</Button>
   </div>
 };
